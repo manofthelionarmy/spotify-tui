@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"spotify-tui/internal/auth"
 
 	tea "github.com/charmbracelet/bubbletea"
 	spotify "github.com/zmb3/spotify/v2"
@@ -22,7 +23,7 @@ type model struct {
 // New returns a bubbletea Model
 func New() tea.Model {
 	// use this to login to spotify
-	client, err := Auth()
+	client, err := auth.PCKE().Auth()
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
