@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
-	"spotify-tui/internal/auth"
+	"spotify-tui/internal/auth/pcke"
 
 	tea "github.com/charmbracelet/bubbletea"
 	spotify "github.com/zmb3/spotify/v2"
@@ -23,7 +23,7 @@ type model struct {
 // New returns a bubbletea Model
 func New() tea.Model {
 	// use this to login to spotify
-	client, err := auth.PCKE().Auth()
+	client, err := pcke.Auth()
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
@@ -41,6 +41,8 @@ func New() tea.Model {
 // Init is the first function that will be called. It returns an optional
 // initial command. To not perform an initial command return nil.
 func (m *model) Init() tea.Cmd {
+	// TODO: do the auth here, we're going to change the views to select our choices
+	// TODO: create first workflow
 	return func() tea.Msg {
 		query := url.QueryEscape("artist=playboi carti")
 		res, err := m.spotifyClient.Search(context.Background(), query, spotify.SearchTypeArtist)

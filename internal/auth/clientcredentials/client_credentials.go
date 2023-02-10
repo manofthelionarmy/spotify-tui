@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"net/http"
+	"spotify-tui/internal/auth"
 
 	spotify "github.com/zmb3/spotify/v2"
 	spotifyauth "github.com/zmb3/spotify/v2/auth"
@@ -10,7 +11,6 @@ import (
 )
 
 type authServer struct {
-	close  chan bool
 	server http.ServeMux
 }
 
@@ -24,8 +24,8 @@ type config struct {
 var cfg config
 
 // ClientCredentials creates a new auth server and does the authentication
-func ClientCredentials() Authenticator {
-	return authFunc(func() (*spotify.Client, error) {
+func ClientCredentials() auth.Authenticator {
+	return auth.AuthorizationFunc(func() (*spotify.Client, error) {
 		ctx := context.Background()
 
 		// I won't be able to access the users profile data if I use the client credentials

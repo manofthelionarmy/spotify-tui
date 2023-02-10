@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
-	"spotify-tui/internal/spotify"
+	"spotify-tui/model/spotify"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
