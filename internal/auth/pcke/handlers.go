@@ -9,7 +9,7 @@ import (
 	"golang.org/x/oauth2"
 )
 
-func (p *pcke) completeAuth(w http.ResponseWriter, r *http.Request) {
+func (p pcke) completeAuth(w http.ResponseWriter, r *http.Request) {
 	// here we pass the codeVerifier in order to get the token
 	tok, err := p.spotifyAuth.Token(r.Context(), p.state, r,
 		oauth2.SetAuthURLParam("code_verifier", p.codeVerifier))

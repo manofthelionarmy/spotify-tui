@@ -38,7 +38,7 @@ func Auth() (*spotify.Client, error) {
 		spotifyauth.WithScopes(spotifyauth.ScopeUserReadPrivate),
 		spotifyauth.WithClientID(clientID))
 
-	p := &pcke{
+	p := pcke{
 		state:         state,
 		codeVerifier:  string(codeVerifier),
 		codeChallenge: codeChallenge,
@@ -71,7 +71,7 @@ func Auth() (*spotify.Client, error) {
 }
 
 // newServer creates a new server with our mux that handles our redirectURI as a route
-func (p *pcke) newServer() http.Server {
+func (p pcke) newServer() http.Server {
 	authServer := http.Server{
 		Addr:    ":8080",
 		Handler: p.routes(),
