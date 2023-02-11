@@ -6,6 +6,7 @@ package models
 import tea "github.com/charmbracelet/bubbletea"
 
 var _ TeaTree = (*tree)(nil)
+var _ TeaTree = (*Cassava)(nil)
 
 // tree implements our tree
 type tree struct {
@@ -60,26 +61,26 @@ func New(rootModel tea.Model) Cassava {
 }
 
 // Parent returns the parent node
-func (c *Cassava) Parent() TeaTree {
+func (c Cassava) Parent() TeaTree {
 	return c.tree.Parent()
 }
 
 // Children returns the children belonging to the current node
-func (c *Cassava) Children() []TeaTree {
+func (c Cassava) Children() []TeaTree {
 	return c.tree.Children()
 }
 
 // Child returns the child node at the given idx
-func (c *Cassava) Child(idx int) TeaTree {
+func (c Cassava) Child(idx int) TeaTree {
 	return c.tree.Child(idx)
 }
 
 // AddChild adds a child node to the current node
-func (c *Cassava) AddChild(m tea.Model) {
+func (c Cassava) AddChild(m tea.Model) {
 	c.tree.AddChild(m)
 }
 
 // Value returns the tea.Model
-func (c *Cassava) Value() tea.Model {
+func (c Cassava) Value() tea.Model {
 	return c.tree.Value()
 }
