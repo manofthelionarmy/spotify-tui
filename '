@@ -1,0 +1,49 @@
+package models
+
+import (
+	"context"
+	"log"
+
+	"github.com/charmbracelet/bubbles/list"
+	"github.com/zmb3/spotify/v2"
+)
+
+// Song represents the Tracks object from Spotify
+type Song struct {
+	Name string
+}
+
+// GetSongs gets all of the artists songs based on their spotify id
+func GetSongs(client *spotify.Client, id spotify.ID) ([]*Song, error) {
+	tracks, err := client.GetTracks(context.Background(),
+		[]spotify.ID{id},
+	)
+	if err != nil {
+		log.Fatal(err)
+		return nil, err
+	}
+	songs := make([]*Song, len(tracks))
+	for i := range tracks {
+		songs[i] = &Song{
+			Name: (*tracks[i]).Name,
+		}
+	}
+	return songs, nil
+}
+
+// FilterValue is the value we use when filtering against this item when we're filtering the list.
+func (s *Song) FilterValue() string {
+	return s.Name
+}
+
+// Title returns the song title
+func (s *Song) Title() string {
+	return s.Name
+}
+
+// Description returns the song description
+func (s *Song) Description() string {
+	return ""
+}
+
+var _ list.DefaultItem = (*Song)(nil)

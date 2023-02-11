@@ -3,7 +3,6 @@ package auth
 import (
 	"context"
 	"net/http"
-	"spotify-tui/internal/auth"
 
 	spotify "github.com/zmb3/spotify/v2"
 	spotifyauth "github.com/zmb3/spotify/v2/auth"
@@ -24,29 +23,26 @@ type config struct {
 var cfg config
 
 // ClientCredentials creates a new auth server and does the authentication
-func ClientCredentials() auth.Authenticator {
-	return auth.AuthorizationFunc(func() (*spotify.Client, error) {
-		ctx := context.Background()
+func ClientCredentials() (*spotify.Client, error) {
+	ctx := context.Background()
 
-		// I won't be able to access the users profile data if I use the client credentials
-		// which makes me think they won't be able to access their playlists
-		// let's have a agile mindset. Get a working mvp, abstract auth details away, and then implement the other kinds of auth (PCKE or authorization code flow)
-		config := &clientcredentials.Config{
-			ClientID:     cfg.clientID,
-			ClientSecret: cfg.secretKey,
-			TokenURL:     spotifyauth.TokenURL,
-		}
+	// I won't be able to access the users profile data if I use the client credentials
+	// which makes me think they won't be able to access their playlists
+	// let's have a agile mindset. Get a working mvp, abstract auth details away, and then implement the other kinds of auth (PCKE or authorization code flow)
+	config := &clientcredentials.Config{
+		ClientID:     cfg.clientID,
+		ClientSecret: cfg.secretKey,
+		TokenURL:     spotifyauth.TokenURL,
+	}
 
-		token, err := config.Token(ctx)
-		if err != nil {
-			return nil, err
-		}
-		// the doc says that this will renew the token
-		httpClient := spotifyauth.New().Client(ctx, token)
-		client := spotify.New(httpClient)
-		return client, nil
-
-	})
+	token, err := config.Token(ctx)
+	if err != nil {
+		return nil, err
+	}
+	// the doc says that this will renew the token
+	httpClient := spotifyauth.New().Client(ctx, token)
+	client := spotify.New(httpClient)
+	return client, nil
 }
 
 // have a dev setting
