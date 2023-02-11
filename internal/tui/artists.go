@@ -2,7 +2,6 @@ package tui
 
 import (
 	"fmt"
-	"log"
 	"spotify-tui/internal/models"
 
 	"github.com/charmbracelet/bubbles/list"
@@ -62,6 +61,7 @@ func (m *searchArtistModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if !m.textInput.Focused() {
 				m.selectedArtist = false
 				m.textInput.Focus()
+				m.textInput.Reset()
 			}
 		case tea.KeyCtrlC:
 			return m, tea.Quit
@@ -75,6 +75,7 @@ func (m *searchArtistModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 	// We handle errors just like any other message
+	// See the docs in how to properly handle errors
 	case error:
 		m.err = msg
 		return m, nil
@@ -84,21 +85,22 @@ func (m *searchArtistModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	cmds = append(cmds, cmd)
 	if !m.textInput.Focused() && !m.selectedArtist {
 		query := m.textInput.Value()
+		// how do we know if it's empty?
 		// I need to set the focus to my results view
 		// oh dang, how am I gonna pass the spotify client among these?
 		resultsModel, _ := newResults(m.spotifyClient, query,
 			m.windowWidth, m.windowHeight-10)
-		// got it to work, remember, for composite functions to work, I have to call the update function
+
 		m.artistList = resultsModel.list
+		// but each update returns a new one, so would it hurt to create a new one?
 		m.artistList, cmd = m.artistList.Update(msg)
 		cmds = append(cmds, cmd)
 	} else if m.selectedArtist {
 		selectedItem := m.artistList.SelectedItem()
-		artist, ok := selectedItem.(*models.Artist)
-		if !ok {
-			log.Fatal("here")
-		}
-		songsList := newArtistsSongsModel(m.spotifyClient, artist.ID, m.windowWidth, m.windowHeight)
+		artist, _ := selectedItem.(*models.Artist)
+		songsList := newArtistsSongsModel(m.spotifyClient, m,
+			artist.ID, m.windowWidth, m.windowHeight)
+
 		return songsList, nil
 	}
 	return m, tea.Batch(cmds...)

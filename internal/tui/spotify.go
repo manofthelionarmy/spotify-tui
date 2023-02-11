@@ -13,7 +13,7 @@ type spotifyModel struct {
 	choice        selection
 	choices       []string
 	cursor        int
-	artistsLayout tea.Model
+	artistsLayout *tea.Model
 	width         int
 	height        int
 	spotifyClient *spotify.Client
