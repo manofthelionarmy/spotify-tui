@@ -33,9 +33,18 @@ func Auth() (*spotify.Client, error) {
 	// we need the state to prevent CSRF
 	state := generateRandomState()
 
+	// TODO: figure out other permissions
 	// Create the spotify Authenticator and pass in these optional values
 	spotifyAuth := spotifyauth.New(spotifyauth.WithRedirectURL(redirectURI),
-		spotifyauth.WithScopes(spotifyauth.ScopeUserReadPrivate),
+		spotifyauth.WithScopes(
+			spotifyauth.ScopeUserReadPrivate,
+			spotifyauth.ScopePlaylistReadPrivate,
+			spotifyauth.ScopeStreaming,
+			spotifyauth.ScopeUserLibraryModify,
+			spotifyauth.ScopeUserReadPlaybackState,
+			spotifyauth.ScopeUserLibraryRead,
+			spotifyauth.ScopeUserModifyPlaybackState,
+		),
 		spotifyauth.WithClientID(clientID))
 
 	p := pcke{

@@ -10,7 +10,8 @@ import (
 
 // Song represents the Tracks object from Spotify
 type Song struct {
-	Name string
+	Name    string
+	SongURI spotify.URI
 }
 
 // GetSongs gets all of the artists songs based on their spotify id
@@ -31,7 +32,8 @@ func GetSongs(client *spotify.Client, artistID spotify.ID) ([]*Song, error) {
 	for i := range albumTracksPage.Tracks {
 		// BUG: I don't know what's going on but it seems like we get this as null
 		s := &Song{
-			Name: albumTracksPage.Tracks[i].Name,
+			Name:    albumTracksPage.Tracks[i].Name,
+			SongURI: albumTracksPage.Tracks[i].URI,
 		}
 
 		songs[i] = s
