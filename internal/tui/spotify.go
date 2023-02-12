@@ -157,9 +157,11 @@ func (m *composite) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.searchPrompt.searching = false
 			m.searchPrompt.textInput.Reset()
 			m.searchPrompt.textInput.Focus()
+			// remove all of the items
 			for len(m.displayArtists.list.Items()) > 0 {
 				m.displayArtists.list.RemoveItem(0)
 			}
+			// remove all of the artists
 			for len(m.displayArtists.artists) > 0 {
 				m.displayArtists.artists = m.displayArtists.artists[:len(m.displayArtists.artists)-1]
 			}
@@ -168,7 +170,7 @@ func (m *composite) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.displaySongs.renderSongs {
 				m.handleSelectedSong()
 			} else if m.searchPrompt.textInput.Focused() {
-				m.handleSearching()
+				m.handleSearchingForArtists()
 			} else {
 				cmd := m.handleSelectedArtist()
 				cmds = append(cmds, cmd)
@@ -252,7 +254,9 @@ func (m *composite) handleSelectedArtist() tea.Cmd {
 	}
 }
 
-func (m *composite) handleSearching() {
+// It looks like we are currently searching for artists
+func (m *composite) handleSearchingForArtists() {
+	// should we send this current value as a msg?
 	m.searchPrompt.searching = true
 	m.searchPrompt.textInput.Blur()
 }
