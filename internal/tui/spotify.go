@@ -7,6 +7,7 @@ import (
 	"spotify-tui/internal/auth/pcke"
 	"spotify-tui/internal/models"
 
+	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/list"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
@@ -31,10 +32,21 @@ type displaySongs struct {
 	list         list.Model
 }
 
+// searching for artist, browsing artist, browsing song
+type appState int
+
+const (
+	searchingArtists appState = iota
+	browsingArtists
+	browsingSongs
+)
+
 type composite struct {
+	keyMap KeyMap
 	searchPrompt
 	displayArtists
 	displaySongs
+	appState
 	spotifyClient *spotify.Client
 	width         int
 	height        int
@@ -60,7 +72,10 @@ func NewComposite() tea.Model {
 	songsList := list.New([]list.Item{}, list.DefaultDelegate{}, 0, 0)
 	songsList.Title = "Songs..."
 
-	return &composite{
+	// I don't want to quit
+	// songsList.KeyMap.Quit.SetEnabled(false)
+
+	composite := &composite{
 		spotifyClient: client,
 		searchPrompt: searchPrompt{
 			textInput: textInput,
@@ -76,7 +91,11 @@ func NewComposite() tea.Model {
 			renderSongs:  false,
 			selectedSong: false,
 		},
+		keyMap:   AppKeyMap(),
+		appState: searchingArtists,
 	}
+	composite.updateKeyBindings()
+	return composite
 }
 
 // SpotifySearchArtistsMsg is a message sent
@@ -123,77 +142,31 @@ func (m *composite) Init() tea.Cmd {
 // Update is called when a message is received. Use it to inspect messages
 // and, in response, update the model and/or send a command.
 func (m *composite) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	var cmd tea.Cmd
 	var cmds []tea.Cmd
 	switch msg := msg.(type) {
 	// TODO: study bubble tea lists to see how they handle this stuff more cleanly
 	case SpotifySearchSongsRespMsg:
-		m.displaySongs.songs = SongsResponse(msg)
-		items := make([]list.Item, len(m.displaySongs.songs))
-		for i := range items {
-			items[i] = m.displaySongs.songs[i]
-		}
-		m.displaySongs.list.SetItems(items)
-		m.displaySongs.renderSongs = true
+		m.handleSearchSongsResponse(SongsResponse(msg))
+		// return m, nil
 	case SpotifySearchArtistsMsg:
-		// handle the message being sent with the retrieved response sent from the command
-		m.displayArtists.artists = ArtistsResponse(msg)
-		items := make([]list.Item, len(m.displayArtists.artists))
-		for i := range items {
-			items[i] = m.displayArtists.artists[i]
-		}
-		m.displayArtists.list.SetItems(items)
-		m.searching = false
+		// handle the message being sent with the retrieved response sent from the tea.Cmd
+		m.handleSearchArtistResponse(ArtistsResponse(msg))
+		// return m, nil
 	case tea.WindowSizeMsg:
-		// m.width, m.height = msg.Width, msg.Height
 		m.displayArtists.list.SetSize(msg.Width, msg.Height-10)
 		m.displaySongs.list.SetSize(msg.Width, msg.Height)
 	case tea.KeyMsg:
-		switch msg.Type {
-		case tea.KeyCtrlC:
+		if key.Matches(msg, m.keyMap.ForceQuit) {
 			return m, tea.Quit
-		case tea.KeyEsc:
-			// the esc key is resolved for list.Model... ugggghh
-			m.searchPrompt.searching = false
-			m.searchPrompt.textInput.Reset()
-			m.searchPrompt.textInput.Focus()
-			// remove all of the items
-			for len(m.displayArtists.list.Items()) > 0 {
-				m.displayArtists.list.RemoveItem(0)
-			}
-			// remove all of the artists
-			for len(m.displayArtists.artists) > 0 {
-				m.displayArtists.artists = m.displayArtists.artists[:len(m.displayArtists.artists)-1]
-			}
-		case tea.KeyEnter:
-			// TODO: handle when we are rendering the displaySongs model
-			if m.displaySongs.renderSongs {
-				m.handleSelectedSong()
-			} else if m.searchPrompt.textInput.Focused() {
-				m.handleSearchingForArtists()
-			} else {
-				cmd := m.handleSelectedArtist()
-				cmds = append(cmds, cmd)
-			}
 		}
 	}
 
-	if m.searchPrompt.searching == true {
-		cmd := m.getArtists(m.searchPrompt.textInput.Value())
-		cmds = append(cmds, cmd)
-	}
-
-	if m.searchPrompt.textInput.Focused() {
-		m.searchPrompt.textInput, cmd = m.searchPrompt.textInput.Update(msg)
-		cmds = append(cmds, cmd)
-	} else if !m.searchPrompt.textInput.Focused() && !m.displaySongs.renderSongs {
-		// the esc key will be picked up
-		// I only want this to update when the searchPrompt isn't in focus
-		m.displayArtists.list, cmd = m.displayArtists.list.Update(msg)
-		cmds = append(cmds, cmd)
-	} else if m.displaySongs.renderSongs {
-		m.displaySongs.list, cmd = m.displaySongs.list.Update(msg)
-		cmds = append(cmds, cmd)
+	if m.appState == searchingArtists {
+		cmds = append(cmds, m.handleSearchingArtists(msg))
+	} else if m.appState == browsingArtists {
+		cmds = append(cmds, m.handleBrowsingArtists(msg))
+	} else if m.appState == browsingSongs {
+		cmds = append(cmds, m.handleBrowsingSongs(msg))
 	}
 
 	return m, tea.Batch(cmds...)
@@ -202,7 +175,7 @@ func (m *composite) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 // View renders the program's UI, which is just a string. The view is
 // rendered after every Update.
 func (m *composite) View() string {
-	if !m.displaySongs.renderSongs {
+	if m.appState != browsingSongs {
 		return m.searchPrompt.View() + "\n" +
 			m.displayArtists.list.View()
 	}
@@ -210,39 +183,21 @@ func (m *composite) View() string {
 }
 
 func (m *composite) getArtists(query string) tea.Cmd {
-
+	// log.Println("getting artists")
 	// return artists
+	// The bug is here, this command is not being processed
 	return func() tea.Msg {
+		// this message isn't being processed, something weird is happening
 		artists, _ := models.GetArtists(m.spotifyClient, query)
 		return SpotifySearchArtistsMsg(artists)
 	}
-}
-
-// func (m *composite) handleArtistsResponse()
-
-// Init is the first function that will be called. It returns an optional
-// initial command. To not perform an initial command return nil.
-func (m *displayArtists) Init() tea.Cmd {
-	return nil
-}
-
-// Update is called when a message is received. Use it to inspect messages
-// and, in response, update the model and/or send a command.
-func (m *displayArtists) Update(_ tea.Msg) (tea.Model, tea.Cmd) {
-	panic("not implemented") // TODO: Implement
-}
-
-// View renders the program's UI, which is just a string. The view is
-// rendered after every Update.
-func (m *displayArtists) View() string {
-	panic("not implemented") // TODO: Implement
 }
 
 func (m *composite) handleSelectedArtist() tea.Cmd {
 	// return songs
 	return func() tea.Msg {
 		// set this to true
-		m.displayArtists.selectedArtist = true
+		// m.displayArtists.selectedArtist = false
 
 		// get the selected item
 		seletectedItem := m.displayArtists.list.SelectedItem()
@@ -264,11 +219,12 @@ func (m *composite) handleSearchingForArtists() {
 // TODO: handle error and send it as a message, or send the selected song as a message and handle it
 // I think that's better
 func (m *composite) handleSelectedSong() {
-
-	m.displaySongs.selectedSong = true
+	// m.displaySongs.selectedSong = true
 	selectedItem := m.displaySongs.list.SelectedItem()
 	song := selectedItem.(*models.Song)
 
+	// bug, if it's paused and try to get the devices, it will return none
+	// I need to check the state if it's paused or played
 	devices, _ := m.spotifyClient.PlayerDevices(context.Background())
 	m.spotifyClient.PlayOpt(context.Background(),
 		&spotify.PlayOptions{
@@ -276,4 +232,151 @@ func (m *composite) handleSelectedSong() {
 			DeviceID: &devices[0].ID,
 		},
 	)
+}
+
+func (m *composite) resetDisplayList() {
+	// remove all of the items
+	for len(m.displayArtists.list.Items()) > 0 {
+		m.displayArtists.list.RemoveItem(0)
+	}
+	// remove all of the artists
+	for len(m.displayArtists.artists) > 0 {
+		m.displayArtists.artists = m.displayArtists.artists[:len(m.displayArtists.artists)-1]
+	}
+}
+
+func (m *composite) resetSearchPrompt() {
+	// the esc key is resolved for list.Model... ugggghh
+	m.searchPrompt.searching = false
+	m.searchPrompt.textInput.Reset()
+	m.searchPrompt.textInput.Focus()
+}
+
+func (m *composite) resetSongsList() {
+	// remove all of the items
+	for len(m.displayArtists.list.Items()) > 0 {
+		m.displaySongs.list.RemoveItem(0)
+	}
+
+	// remove all of the artists
+	for len(m.displaySongs.songs) > 0 {
+		m.displaySongs.songs = m.displaySongs.songs[:len(m.displaySongs.songs)-1]
+	}
+}
+
+func (m *composite) populateSongsList(songs []*models.Song) {
+	m.displaySongs.songs = songs
+	items := make([]list.Item, len(m.displaySongs.songs))
+	for i := range items {
+		items[i] = m.displaySongs.songs[i]
+	}
+	m.displaySongs.list.SetItems(items)
+}
+
+func (m *composite) populateArtists(artists []*models.Artist) {
+	m.displayArtists.artists = artists
+	items := make([]list.Item, len(m.displayArtists.artists))
+	for i := range items {
+		items[i] = m.displayArtists.artists[i]
+	}
+	m.displayArtists.list.SetItems(items)
+}
+
+func (m *composite) handleSearchArtistResponse(artists []*models.Artist) {
+	m.populateArtists(artists)
+}
+
+func (m *composite) handleSearchSongsResponse(songs []*models.Song) {
+	m.populateSongsList(songs)
+}
+
+func (m *composite) handleSearchingArtists(msg tea.Msg) tea.Cmd {
+	var cmds []tea.Cmd
+	if msg, ok := msg.(tea.KeyMsg); ok {
+		switch {
+		case key.Matches(msg, m.keyMap.SubmitSearch):
+			m.searchPrompt.textInput.Blur()
+			m.appState = browsingArtists
+			m.searching = true
+			m.updateKeyBindings()
+		}
+	}
+	newTextInputInput, cmd := m.searchPrompt.textInput.Update(msg)
+	m.searchPrompt.textInput = newTextInputInput
+	cmds = append(cmds, cmd)
+
+	if m.searching == true {
+		cmds = append(cmds, m.getArtists(m.searchPrompt.textInput.Value()))
+	}
+	return tea.Batch(cmds...)
+}
+
+func (m *composite) handleBrowsingArtists(msg tea.Msg) tea.Cmd {
+	var cmds []tea.Cmd
+	var cmd tea.Cmd
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		if key.Matches(msg, m.keyMap.ClearSearch) {
+			// a bit weird but we're saying we want to clear the search
+			m.searching = false
+			m.appState = searchingArtists
+			m.searchPrompt.textInput.Focus()
+			m.searchPrompt.textInput.Reset()
+			return nil
+		}
+		if key.Matches(msg, m.keyMap.SelectedArtist) {
+			m.selectedArtist = true
+			m.appState = browsingSongs
+			m.updateKeyBindings()
+		}
+	}
+	m.displayArtists.list, cmd = m.displayArtists.list.Update(msg)
+	cmds = append(cmds, cmd)
+	if m.selectedArtist {
+		cmds = append(cmds, m.handleSelectedArtist())
+	}
+	return tea.Batch(cmds...)
+}
+
+func (m *composite) handleBrowsingSongs(msg tea.Msg) tea.Cmd {
+	var cmd tea.Cmd
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		// I can figure out how to do go back, this is feature creep, but overall I have a cleaner way of
+		// coding this project
+		if key.Matches(msg, m.keyMap.GoBack) {
+			// a bit weird but we're saying we want to clear the search
+			m.searching = false
+			m.searchPrompt.textInput.Focus()
+			m.searchPrompt.textInput.Reset()
+			m.selectedArtist = false
+			m.appState = searchingArtists
+			m.updateKeyBindings()
+			m.resetSongsList()
+			// I need to update the display song lists
+			// m.displaySongs.list, cmd = m.displaySongs.list.Update(msg)
+			// return nil
+		} else if key.Matches(msg, m.keyMap.SelectedSong) {
+			m.handleSelectedSong()
+		}
+	}
+	m.displaySongs.list, cmd = m.displaySongs.list.Update(msg)
+	return cmd
+}
+
+func (m *composite) updateKeyBindings() {
+	switch m.appState {
+	case searchingArtists:
+		m.keyMap.SubmitSearch.SetEnabled(true)
+		m.keyMap.SelectedArtist.SetEnabled(false)
+		m.keyMap.SelectedSong.SetEnabled(false)
+	case browsingArtists:
+		m.keyMap.SubmitSearch.SetEnabled(false)
+		m.keyMap.SelectedArtist.SetEnabled(true)
+		m.keyMap.SelectedSong.SetEnabled(false)
+	case browsingSongs:
+		m.keyMap.SubmitSearch.SetEnabled(false)
+		m.keyMap.SelectedArtist.SetEnabled(false)
+		m.keyMap.SelectedSong.SetEnabled(true)
+	}
 }
