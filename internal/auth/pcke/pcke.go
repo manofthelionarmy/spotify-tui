@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"os/exec"
+	tk "spotify-tui/internal/auth/token"
 
 	spotify "github.com/zmb3/spotify/v2"
 	spotifyauth "github.com/zmb3/spotify/v2/auth"
@@ -19,22 +20,19 @@ type pcke struct {
 	state         string
 	codeVerifier  string
 	codeChallenge string
-	ch            chan *spotify.Client
+	ch            chan msg
 	spotifyAuth   *spotifyauth.Authenticator
+}
+
+type msg struct {
+	tok    *oauth2.Token
+	client *spotify.Client
 }
 
 // Auth will create the server to host our redirectURI and get our access token
 func Auth() (*spotify.Client, error) {
-	// create the code_verifier and code_challenge
-	codeVerifier, _ := generateRandomString(128)
-	codeChallenge := sha256UrlEncode(codeVerifier)
-
-	// check the api documenation for why we need a state
-	// we need the state to prevent CSRF
-	state := generateRandomState()
-
-	// TODO: figure out other permissions
-	// Create the spotify Authenticator and pass in these optional values
+	// Create the spotify Authenticator and pass in values to set up our redirectURI,
+	// scope permissions, and client id
 	spotifyAuth := spotifyauth.New(spotifyauth.WithRedirectURL(redirectURI),
 		spotifyauth.WithScopes(
 			spotifyauth.ScopeUserReadPrivate,
@@ -47,12 +45,36 @@ func Auth() (*spotify.Client, error) {
 		),
 		spotifyauth.WithClientID(clientID))
 
+	// Retrieve the token if it exists
+	tok, err := tk.RetrieveToken()
+	if err == nil {
+		// No error and we have our token
+		client := spotify.New(spotifyAuth.Client(context.Background(), tok))
+		return client, nil
+	} else if err != tk.ErrTokenNotFound &&
+		err != tk.ErrSpotifyTuiDirNotFound &&
+		err != tk.ErrSpotifyTokenExpired {
+		// there was an error and it doens't match our expected errors
+		return nil, err
+	}
+
+	// The token wasn't found, so we will do our oauth2 flow
+
+	// create the code_verifier and code_challenge
+	codeVerifier, _ := generateRandomString(128)
+	codeChallenge := sha256UrlEncode(codeVerifier)
+
+	// check the api documenation for why we need a state
+	// we need the state to prevent CSRF
+	state := generateRandomState()
+
+	// TODO: figure out other permissions
 	p := pcke{
 		state:         state,
 		codeVerifier:  string(codeVerifier),
 		codeChallenge: codeChallenge,
 		spotifyAuth:   spotifyAuth,
-		ch:            make(chan *spotify.Client),
+		ch:            make(chan msg),
 	}
 
 	// create a new server that handles our redirectURI as a route. there will be hander that gets a token
@@ -69,14 +91,18 @@ func Auth() (*spotify.Client, error) {
 
 	// open the spotify auth url in the browser
 	cmd := exec.Command("xdg-open", url)
-	err := cmd.Run()
+	err = cmd.Run()
 	if err != nil {
 		return nil, err
 	}
 
-	// a client will be sent to this channel via the http handler handling our redirectURI as a route
-	client := <-p.ch
-	return client, nil
+	// a tok will be sent to this channel via the http handler handling our redirectURI as a route
+	msg := <-p.ch
+	err = tk.StoreToken(*msg.tok)
+	if err != nil {
+		return nil, err
+	}
+	return msg.client, nil
 }
 
 // newServer creates a new server with our mux that handles our redirectURI as a route

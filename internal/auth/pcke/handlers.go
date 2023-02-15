@@ -26,5 +26,8 @@ func (p pcke) completeAuth(w http.ResponseWriter, r *http.Request) {
 	client := spotify.New(p.spotifyAuth.Client(r.Context(), tok))
 	fmt.Fprintf(w, "Login Completed!")
 	// signal we have a client
-	p.ch <- client
+	p.ch <- msg{
+		tok:    tok,
+		client: client,
+	}
 }
