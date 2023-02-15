@@ -68,9 +68,11 @@ func NewComposite() tea.Model {
 
 	artistList := list.New([]list.Item{}, list.DefaultDelegate{}, 0, 0)
 	artistList.Title = "Artists..."
+	artistList.KeyMap.Quit.Unbind()
 
 	songsList := list.New([]list.Item{}, list.DefaultDelegate{}, 0, 0)
 	songsList.Title = "Songs..."
+	songsList.KeyMap.Quit.Unbind()
 
 	// I don't want to quit
 	// songsList.KeyMap.Quit.SetEnabled(false)
@@ -147,11 +149,9 @@ func (m *composite) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// TODO: study bubble tea lists to see how they handle this stuff more cleanly
 	case SpotifySearchSongsRespMsg:
 		m.handleSearchSongsResponse(SongsResponse(msg))
-		// return m, nil
 	case SpotifySearchArtistsMsg:
 		// handle the message being sent with the retrieved response sent from the tea.Cmd
 		m.handleSearchArtistResponse(ArtistsResponse(msg))
-		// return m, nil
 	case tea.WindowSizeMsg:
 		m.displayArtists.list.SetSize(msg.Width, msg.Height-10)
 		m.displaySongs.list.SetSize(msg.Width, msg.Height)
@@ -183,11 +183,7 @@ func (m *composite) View() string {
 }
 
 func (m *composite) getArtists(query string) tea.Cmd {
-	// log.Println("getting artists")
-	// return artists
-	// The bug is here, this command is not being processed
 	return func() tea.Msg {
-		// this message isn't being processed, something weird is happening
 		artists, _ := models.GetArtists(m.spotifyClient, query)
 		return SpotifySearchArtistsMsg(artists)
 	}
@@ -234,7 +230,7 @@ func (m *composite) handleSelectedSong() {
 	)
 }
 
-func (m *composite) resetDisplayList() {
+func (m *composite) resetDisplayArtistList() {
 	// remove all of the items
 	for len(m.displayArtists.list.Items()) > 0 {
 		m.displayArtists.list.RemoveItem(0)
@@ -320,8 +316,10 @@ func (m *composite) handleBrowsingArtists(msg tea.Msg) tea.Cmd {
 			// a bit weird but we're saying we want to clear the search
 			m.searching = false
 			m.appState = searchingArtists
+			m.updateKeyBindings()
 			m.searchPrompt.textInput.Focus()
 			m.searchPrompt.textInput.Reset()
+			// I need to reset the list
 			return nil
 		}
 		if key.Matches(msg, m.keyMap.SelectedArtist) {
@@ -340,6 +338,7 @@ func (m *composite) handleBrowsingArtists(msg tea.Msg) tea.Cmd {
 
 func (m *composite) handleBrowsingSongs(msg tea.Msg) tea.Cmd {
 	var cmd tea.Cmd
+	var cmds []tea.Cmd
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		// I can figure out how to do go back, this is feature creep, but overall I have a cleaner way of
@@ -352,16 +351,22 @@ func (m *composite) handleBrowsingSongs(msg tea.Msg) tea.Cmd {
 			m.selectedArtist = false
 			m.appState = searchingArtists
 			m.updateKeyBindings()
+			m.resetDisplayArtistList()
 			m.resetSongsList()
-			// I need to update the display song lists
-			// m.displaySongs.list, cmd = m.displaySongs.list.Update(msg)
-			// return nil
+
+			m.searchPrompt.textInput, cmd = m.searchPrompt.textInput.Update(msg)
+			cmds = append(cmds, cmd)
+			m.displayArtists.list, cmd = m.displayArtists.list.Update(msg)
+			cmds = append(cmds, cmd)
 		} else if key.Matches(msg, m.keyMap.SelectedSong) {
 			m.handleSelectedSong()
 		}
 	}
+	// something weird is happening, this doesn't go away
+	// this is taking a while to update
 	m.displaySongs.list, cmd = m.displaySongs.list.Update(msg)
-	return cmd
+	cmds = append(cmds, cmd)
+	return tea.Batch(cmds...)
 }
 
 func (m *composite) updateKeyBindings() {
