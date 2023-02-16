@@ -4,13 +4,14 @@ import "github.com/charmbracelet/bubbles/key"
 
 // KeyMap represents my key bindings
 type KeyMap struct {
-	GoBack         key.Binding
-	ClearSearch    key.Binding
-	SelectedArtist key.Binding
-	SelectedSong   key.Binding
-	SubmitSearch   key.Binding
-	ForceQuit      key.Binding
-	Quit           key.Binding
+	GoBack                   key.Binding
+	ClearSearch              key.Binding
+	SelectedArtist           key.Binding
+	SelectedSong             key.Binding
+	SelectedAlbumOrTopTracks key.Binding
+	SubmitSearch             key.Binding
+	ForceQuit                key.Binding
+	Quit                     key.Binding
 }
 
 // AppKeyMap returns the apps key mapping
@@ -29,6 +30,9 @@ func AppKeyMap() KeyMap {
 			key.WithKeys("q"),
 		),
 		SubmitSearch: key.NewBinding(
+			key.WithKeys("enter"),
+		),
+		SelectedAlbumOrTopTracks: key.NewBinding(
 			key.WithKeys("enter"),
 		),
 		SelectedArtist: key.NewBinding(

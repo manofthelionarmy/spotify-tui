@@ -25,6 +25,17 @@ type displayArtists struct {
 	list           list.Model
 }
 
+type pickFromChoices struct {
+	albumTracks    tea.Model
+	selectedChoice bool
+}
+
+type displayAlbums struct {
+	selectedAlbum bool
+	albums        []*models.Album
+	list          list.Model
+}
+
 type displaySongs struct {
 	renderSongs  bool
 	selectedSong bool
@@ -37,16 +48,21 @@ type appState int
 
 const (
 	searchingArtists appState = iota
+	selectingAlbumsOrTopTracks
 	browsingArtists
 	browsingSongs
+	browsingAlbums
 )
 
 type composite struct {
 	keyMap KeyMap
 	searchPrompt
 	displayArtists
+	pickFromChoices
+	displayAlbums
 	displaySongs
 	appState
+	artistID      spotify.ID
 	spotifyClient *spotify.Client
 	width         int
 	height        int
@@ -74,8 +90,9 @@ func NewComposite() tea.Model {
 	songsList.Title = "Songs..."
 	songsList.KeyMap.Quit.Unbind()
 
-	// I don't want to quit
-	// songsList.KeyMap.Quit.SetEnabled(false)
+	albumList := list.New([]list.Item{}, list.DefaultDelegate{}, 0, 0)
+	albumList.Title = "Albums..."
+	albumList.KeyMap.Quit.Unbind()
 
 	composite := &composite{
 		spotifyClient: client,
@@ -92,6 +109,15 @@ func NewComposite() tea.Model {
 			list:         songsList,
 			renderSongs:  false,
 			selectedSong: false,
+		},
+		pickFromChoices: pickFromChoices{
+			albumTracks:    NewAlbumTracks(),
+			selectedChoice: false,
+		},
+		displayAlbums: displayAlbums{
+			selectedAlbum: false,
+			albums:        nil,
+			list:          albumList,
 		},
 		keyMap:   AppKeyMap(),
 		appState: searchingArtists,
@@ -114,6 +140,9 @@ type SongsResponse []*models.Song
 
 // SpotifySearchSongsRespMsg is a message signaling we got back an artists songs from spotify api
 type SpotifySearchSongsRespMsg []*models.Song
+
+// SpotifyAlbumsResponse is the alumb response we sent as a message
+type SpotifyAlbumsResponse []*models.Album
 
 // Init is the first function that will be called. It returns an optional
 // initial command. To not perform an initial command return nil.
@@ -147,6 +176,8 @@ func (m *composite) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 	switch msg := msg.(type) {
 	// TODO: study bubble tea lists to see how they handle this stuff more cleanly
+	case SpotifyAlbumsResponse:
+		m.handleAlbumsReponse(SpotifyAlbumsResponse(msg))
 	case SpotifySearchSongsRespMsg:
 		m.handleSearchSongsResponse(SongsResponse(msg))
 	case SpotifySearchArtistsMsg:
@@ -155,6 +186,7 @@ func (m *composite) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.displayArtists.list.SetSize(msg.Width, msg.Height-10)
 		m.displaySongs.list.SetSize(msg.Width, msg.Height)
+		m.displayAlbums.list.SetSize(msg.Width, msg.Height)
 	case tea.KeyMsg:
 		if key.Matches(msg, m.keyMap.ForceQuit) {
 			return m, tea.Quit
@@ -167,6 +199,12 @@ func (m *composite) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		cmds = append(cmds, m.handleBrowsingArtists(msg))
 	} else if m.appState == browsingSongs {
 		cmds = append(cmds, m.handleBrowsingSongs(msg))
+	} else if m.appState == selectingAlbumsOrTopTracks {
+		cmds = append(cmds, m.handleSelectingAlbumsOrTopTracks(msg))
+	} else if m.appState == browsingAlbums {
+		var cmd tea.Cmd
+		m.displayAlbums.list, cmd = m.displayAlbums.list.Update(msg)
+		cmds = append(cmds, cmd)
 	}
 
 	return m, tea.Batch(cmds...)
@@ -175,7 +213,12 @@ func (m *composite) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 // View renders the program's UI, which is just a string. The view is
 // rendered after every Update.
 func (m *composite) View() string {
-	if m.appState != browsingSongs {
+	if m.appState == browsingAlbums {
+		// why isn't this displaying?
+		return m.displayAlbums.list.View()
+	} else if m.appState == selectingAlbumsOrTopTracks {
+		return m.albumTracks.View()
+	} else if m.appState != browsingSongs {
 		return m.searchPrompt.View() + "\n" +
 			m.displayArtists.list.View()
 	}
@@ -286,6 +329,15 @@ func (m *composite) handleSearchSongsResponse(songs []*models.Song) {
 	m.populateSongsList(songs)
 }
 
+func (m *composite) handleAlbumsReponse(albums []*models.Album) {
+	m.displayAlbums.albums = albums
+	items := make([]list.Item, len(m.displayAlbums.albums))
+	for i := range items {
+		items[i] = m.displayAlbums.albums[i]
+	}
+	m.displayAlbums.list.SetItems(items)
+}
+
 func (m *composite) handleSearchingArtists(msg tea.Msg) tea.Cmd {
 	var cmds []tea.Cmd
 	if msg, ok := msg.(tea.KeyMsg); ok {
@@ -324,7 +376,10 @@ func (m *composite) handleBrowsingArtists(msg tea.Msg) tea.Cmd {
 		}
 		if key.Matches(msg, m.keyMap.SelectedArtist) {
 			m.selectedArtist = true
-			m.appState = browsingSongs
+			// m.appState = browsingSongs
+			m.appState = selectingAlbumsOrTopTracks
+			artist, _ := m.displayArtists.list.SelectedItem().(*models.Artist)
+			m.artistID = artist.ID
 			m.updateKeyBindings()
 		}
 	}
@@ -375,13 +430,71 @@ func (m *composite) updateKeyBindings() {
 		m.keyMap.SubmitSearch.SetEnabled(true)
 		m.keyMap.SelectedArtist.SetEnabled(false)
 		m.keyMap.SelectedSong.SetEnabled(false)
+		m.keyMap.SelectedAlbumOrTopTracks.SetEnabled(false)
 	case browsingArtists:
 		m.keyMap.SubmitSearch.SetEnabled(false)
 		m.keyMap.SelectedArtist.SetEnabled(true)
 		m.keyMap.SelectedSong.SetEnabled(false)
+		m.keyMap.SelectedAlbumOrTopTracks.SetEnabled(false)
 	case browsingSongs:
 		m.keyMap.SubmitSearch.SetEnabled(false)
 		m.keyMap.SelectedArtist.SetEnabled(false)
+		m.keyMap.SelectedAlbumOrTopTracks.SetEnabled(false)
 		m.keyMap.SelectedSong.SetEnabled(true)
+	case selectingAlbumsOrTopTracks:
+		m.keyMap.SubmitSearch.SetEnabled(false)
+		m.keyMap.SelectedArtist.SetEnabled(false)
+		m.keyMap.SelectedSong.SetEnabled(false)
+		m.keyMap.SelectedAlbumOrTopTracks.SetEnabled(true)
+	}
+}
+
+func (m *composite) handleSelectingAlbumsOrTopTracks(msg tea.Msg) tea.Cmd {
+	var cmd tea.Cmd
+	var cmds []tea.Cmd
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		// I can figure out how to do go back, this is feature creep, but overall I have a cleaner way of
+		// coding this project
+		if key.Matches(msg, m.keyMap.GoBack) {
+			// a bit weird but we're saying we want to clear the search
+			m.searching = false
+			m.searchPrompt.textInput.Focus()
+			m.searchPrompt.textInput.Reset()
+			m.selectedArtist = false
+			m.selectedChoice = false
+			m.appState = searchingArtists
+			m.artistID = ""
+			m.updateKeyBindings()
+			m.resetDisplayArtistList()
+			m.resetSongsList()
+
+			m.searchPrompt.textInput, cmd = m.searchPrompt.textInput.Update(msg)
+			cmds = append(cmds, cmd)
+			m.displayArtists.list, cmd = m.displayArtists.list.Update(msg)
+			cmds = append(cmds, cmd)
+		} else if key.Matches(msg, m.keyMap.SelectedAlbumOrTopTracks) {
+			m.selectedChoice = true
+			m.appState = browsingAlbums
+		}
+	}
+
+	m.pickFromChoices.albumTracks, cmd = m.albumTracks.Update(msg)
+	cmds = append(cmds, cmd)
+	if m.selectedChoice {
+		albumTrcks, _ := m.albumTracks.(*albumTracks)
+		switch albumTrcks.SelectedItem() {
+		case "Albums":
+			cmds = append(cmds, m.handleSearchAlbums())
+		case "Top Tracks":
+		}
+	}
+	return tea.Batch(cmds...)
+}
+
+func (m *composite) handleSearchAlbums() tea.Cmd {
+	return func() tea.Msg {
+		albums, _ := models.GetAlbums(m.spotifyClient, m.artistID)
+		return SpotifyAlbumsResponse(albums)
 	}
 }
