@@ -61,6 +61,9 @@ func (m *composite) handleBrowsingSongs(msg tea.Msg) tea.Cmd {
 	var cmds []tea.Cmd
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
+		// FIXME: because I disabled esc, we need a way to undo a filter
+		// or I need to handle stuff better, such as checking if we are filtering and then go back
+		// when we are not filtering
 		if key.Matches(msg, m.keyMap.GoBack) {
 			m.setAppState(browsingAlbums)
 			m.updateKeyBindings()
@@ -71,13 +74,10 @@ func (m *composite) handleBrowsingSongs(msg tea.Msg) tea.Cmd {
 			m.selectedAlbum = false
 			return nil
 		} else if key.Matches(msg, m.keyMap.SelectedSong) {
-			m.selectedSong = true
+			m.handleSelectedSong()
 		}
 	}
 
-	if m.selectedSong {
-		m.handleSelectedSong()
-	}
 	// something weird is happening, this doesn't go away
 	// this is taking a while to update
 	m.displaySongs.list, cmd = m.displaySongs.list.Update(msg)
