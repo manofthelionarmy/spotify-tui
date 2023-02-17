@@ -146,7 +146,8 @@ func (m *composite) handleSelectAlbum(msg tea.Msg) tea.Cmd {
 	}
 
 	if m.displayAlbums.selectedAlbum {
-		cmds = append(cmds, m.handleSearchSongsInAlbum())
+		album, _ := m.displayAlbums.list.SelectedItem().(*models.Album)
+		cmds = append(cmds, m.handleSearchSongsInAlbum(album.ID, album.AlbumURI))
 	}
 
 	m.displayAlbums.list, cmd = m.displayAlbums.list.Update(msg)

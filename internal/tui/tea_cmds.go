@@ -41,8 +41,9 @@ func (m *composite) handleSelectedSong() {
 	devices, _ := m.spotifyClient.PlayerDevices(context.Background())
 	m.spotifyClient.PlayOpt(context.Background(),
 		&spotify.PlayOptions{
-			URIs:     []spotify.URI{song.SongURI},
-			DeviceID: &devices[0].ID,
+			DeviceID:       &devices[0].ID,
+			PlaybackOffset: &song.Offset,
+			PositionMs:     0,
 		},
 	)
 }
@@ -54,9 +55,9 @@ func (m *composite) handleSearchAlbums() tea.Cmd {
 	}
 }
 
-func (m *composite) handleSearchSongsInAlbum() tea.Cmd {
+func (m *composite) handleSearchSongsInAlbum(albumID spotify.ID, albumURI spotify.URI) tea.Cmd {
 	return func() tea.Msg {
-		songs, _ := models.GetSongsInAlbum(m.spotifyClient, m.albumID)
+		songs, _ := models.GetSongsInAlbum(m.spotifyClient, albumID, albumURI)
 		return SpotifySearchSongsRespMsg(songs)
 	}
 }

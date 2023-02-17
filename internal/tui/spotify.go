@@ -63,6 +63,7 @@ type composite struct {
 	appState
 	artistID      spotify.ID
 	albumID       spotify.ID
+	albumURI      spotify.URI
 	spotifyClient *spotify.Client
 	width         int
 	height        int

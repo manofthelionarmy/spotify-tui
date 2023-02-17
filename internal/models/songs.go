@@ -12,6 +12,7 @@ import (
 type Song struct {
 	Name    string
 	SongURI spotify.URI
+	Offset  spotify.PlaybackOffset
 }
 
 // GetSongs gets all of the artists songs based on their spotify id
@@ -34,6 +35,10 @@ func GetSongs(client *spotify.Client, artistID spotify.ID) ([]*Song, error) {
 		s := &Song{
 			Name:    albumTracksPage.Tracks[i].Name,
 			SongURI: albumTracksPage.Tracks[i].URI,
+			Offset: spotify.PlaybackOffset{
+				Position: albumTracksPage.Tracks[i].TrackNumber,
+				URI:      album.URI,
+			},
 		}
 
 		songs[i] = s
@@ -42,7 +47,7 @@ func GetSongs(client *spotify.Client, artistID spotify.ID) ([]*Song, error) {
 }
 
 // GetSongsInAlbum gets the songs for an artists album given the album id
-func GetSongsInAlbum(client *spotify.Client, albumID spotify.ID) ([]*Song, error) {
+func GetSongsInAlbum(client *spotify.Client, albumID spotify.ID, albumURI spotify.URI) ([]*Song, error) {
 	songsInAlbum, err := client.GetAlbumTracks(context.Background(), albumID)
 	if err != nil {
 		return nil, err
@@ -52,6 +57,10 @@ func GetSongsInAlbum(client *spotify.Client, albumID spotify.ID) ([]*Song, error
 		s := &Song{
 			Name:    songsInAlbum.Tracks[i].Name,
 			SongURI: songsInAlbum.Tracks[i].URI,
+			Offset: spotify.PlaybackOffset{
+				Position: songsInAlbum.Tracks[i].TrackNumber,
+				URI:      albumURI,
+			},
 		}
 
 		songs[i] = s
