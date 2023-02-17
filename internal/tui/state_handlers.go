@@ -70,11 +70,13 @@ func (m *composite) handleBrowsingSongs(msg tea.Msg) tea.Cmd {
 			m.resetSongsList()
 			// reset this because we want to select a new one
 			m.albumID = ""
+			m.albumURI = ""
 			// reset this because we want to select a new album
 			m.selectedAlbum = false
 			return nil
 		} else if key.Matches(msg, m.keyMap.SelectedSong) {
-			m.handleSelectedSong()
+			// TODO: how to pass the album uri?
+			m.handleSelectedSong(m.albumURI)
 		}
 	}
 
@@ -141,13 +143,13 @@ func (m *composite) handleSelectAlbum(msg tea.Msg) tea.Cmd {
 
 			album, _ := m.displayAlbums.list.SelectedItem().(*models.Album)
 			m.albumID = album.ID
+			m.albumURI = album.AlbumURI
 			m.updateKeyBindings()
 		}
 	}
 
 	if m.displayAlbums.selectedAlbum {
-		album, _ := m.displayAlbums.list.SelectedItem().(*models.Album)
-		cmds = append(cmds, m.handleSearchSongsInAlbum(album.ID, album.AlbumURI))
+		cmds = append(cmds, m.handleSearchSongsInAlbum(m.albumID))
 	}
 
 	m.displayAlbums.list, cmd = m.displayAlbums.list.Update(msg)

@@ -31,7 +31,7 @@ func (m *composite) handleSelectedArtist() tea.Cmd {
 
 // TODO: handle error and send it as a message, or send the selected song as a message and handle it, return an error as its message
 // I think that's better
-func (m *composite) handleSelectedSong() {
+func (m *composite) handleSelectedSong(albumURI spotify.URI) {
 	// m.displaySongs.selectedSong = true
 	selectedItem := m.displaySongs.list.SelectedItem()
 	song := selectedItem.(*models.Song)
@@ -41,9 +41,10 @@ func (m *composite) handleSelectedSong() {
 	devices, _ := m.spotifyClient.PlayerDevices(context.Background())
 	m.spotifyClient.PlayOpt(context.Background(),
 		&spotify.PlayOptions{
-			DeviceID:       &devices[0].ID,
-			PlaybackOffset: &song.Offset,
-			PositionMs:     0,
+			PlaybackContext: &albumURI,
+			DeviceID:        &devices[0].ID,
+			PlaybackOffset:  &song.Offset,
+			PositionMs:      0,
 		},
 	)
 }
@@ -55,9 +56,9 @@ func (m *composite) handleSearchAlbums() tea.Cmd {
 	}
 }
 
-func (m *composite) handleSearchSongsInAlbum(albumID spotify.ID, albumURI spotify.URI) tea.Cmd {
+func (m *composite) handleSearchSongsInAlbum(albumID spotify.ID) tea.Cmd {
 	return func() tea.Msg {
-		songs, _ := models.GetSongsInAlbum(m.spotifyClient, albumID, albumURI)
+		songs, _ := models.GetSongsInAlbum(m.spotifyClient, albumID)
 		return SpotifySearchSongsRespMsg(songs)
 	}
 }

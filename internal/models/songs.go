@@ -37,7 +37,6 @@ func GetSongs(client *spotify.Client, artistID spotify.ID) ([]*Song, error) {
 			SongURI: albumTracksPage.Tracks[i].URI,
 			Offset: spotify.PlaybackOffset{
 				Position: albumTracksPage.Tracks[i].TrackNumber,
-				URI:      album.URI,
 			},
 		}
 
@@ -47,7 +46,7 @@ func GetSongs(client *spotify.Client, artistID spotify.ID) ([]*Song, error) {
 }
 
 // GetSongsInAlbum gets the songs for an artists album given the album id
-func GetSongsInAlbum(client *spotify.Client, albumID spotify.ID, albumURI spotify.URI) ([]*Song, error) {
+func GetSongsInAlbum(client *spotify.Client, albumID spotify.ID) ([]*Song, error) {
 	songsInAlbum, err := client.GetAlbumTracks(context.Background(), albumID)
 	if err != nil {
 		return nil, err
@@ -59,7 +58,6 @@ func GetSongsInAlbum(client *spotify.Client, albumID spotify.ID, albumURI spotif
 			SongURI: songsInAlbum.Tracks[i].URI,
 			Offset: spotify.PlaybackOffset{
 				Position: songsInAlbum.Tracks[i].TrackNumber,
-				URI:      albumURI,
 			},
 		}
 
