@@ -62,19 +62,21 @@ func (m *composite) handleBrowsingSongs(msg tea.Msg) tea.Cmd {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		if key.Matches(msg, m.keyMap.GoBack) {
-			m.resetSearchPrompt()
-			m.setAppState(searchingArtists)
+			m.setAppState(browsingAlbums)
 			m.updateKeyBindings()
-			m.resetDisplayArtist()
 			m.resetSongsList()
-
-			m.searchPrompt.textInput, cmd = m.searchPrompt.textInput.Update(msg)
-			cmds = append(cmds, cmd)
-			m.displayArtists.list, cmd = m.displayArtists.list.Update(msg)
-			cmds = append(cmds, cmd)
+			// reset this because we want to select a new one
+			m.albumID = ""
+			// reset this because we want to select a new album
+			m.selectedAlbum = false
+			return nil
 		} else if key.Matches(msg, m.keyMap.SelectedSong) {
-			m.handleSelectedSong()
+			m.selectedSong = true
 		}
+	}
+
+	if m.selectedSong {
+		m.handleSelectedSong()
 	}
 	// something weird is happening, this doesn't go away
 	// this is taking a while to update
@@ -95,8 +97,7 @@ func (m *composite) handleSelectingAlbumsOrTopTracks(msg tea.Msg) tea.Cmd {
 			m.resetSearchPrompt()
 			m.resetDisplayArtist()
 			m.setAppState(searchingArtists)
-			m.resetComposite()
-			m.resetSongsList()
+			m.artistID = ""
 			m.updateKeyBindings()
 
 			m.searchPrompt.textInput, cmd = m.searchPrompt.textInput.Update(msg)
@@ -106,6 +107,7 @@ func (m *composite) handleSelectingAlbumsOrTopTracks(msg tea.Msg) tea.Cmd {
 		} else if key.Matches(msg, m.keyMap.SelectedAlbumOrTopTracks) {
 			m.selectedChoice = true
 			m.appState = browsingAlbums
+			m.updateKeyBindings()
 		}
 	}
 
@@ -119,5 +121,35 @@ func (m *composite) handleSelectingAlbumsOrTopTracks(msg tea.Msg) tea.Cmd {
 		case "Top Tracks":
 		}
 	}
+	return tea.Batch(cmds...)
+}
+
+func (m *composite) handleSelectAlbum(msg tea.Msg) tea.Cmd {
+	var cmd tea.Cmd
+	var cmds []tea.Cmd
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		if key.Matches(msg, m.keyMap.GoBack) {
+			m.resetPickFromChoices()
+			m.setAppState(selectingAlbumsOrTopTracks)
+			m.updateKeyBindings()
+
+			return nil
+		} else if key.Matches(msg, m.keyMap.SelectAblum) {
+			m.displayAlbums.selectedAlbum = true
+			m.appState = browsingSongs
+
+			album, _ := m.displayAlbums.list.SelectedItem().(*models.Album)
+			m.albumID = album.ID
+			m.updateKeyBindings()
+		}
+	}
+
+	if m.displayAlbums.selectedAlbum {
+		cmds = append(cmds, m.handleSearchSongsInAlbum())
+	}
+
+	m.displayAlbums.list, cmd = m.displayAlbums.list.Update(msg)
+	cmds = append(cmds, cmd)
 	return tea.Batch(cmds...)
 }

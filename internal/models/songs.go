@@ -15,6 +15,7 @@ type Song struct {
 }
 
 // GetSongs gets all of the artists songs based on their spotify id
+// DEPRECATED: this will be no longer used
 func GetSongs(client *spotify.Client, artistID spotify.ID) ([]*Song, error) {
 	// I see what I'm doing wrong, this is based on track id, but I'm using spotify id
 	albumPage, err := client.GetArtistAlbums(context.Background(),
@@ -33,6 +34,24 @@ func GetSongs(client *spotify.Client, artistID spotify.ID) ([]*Song, error) {
 		s := &Song{
 			Name:    albumTracksPage.Tracks[i].Name,
 			SongURI: albumTracksPage.Tracks[i].URI,
+		}
+
+		songs[i] = s
+	}
+	return songs, nil
+}
+
+// GetSongsInAlbum gets the songs for an artists album given the album id
+func GetSongsInAlbum(client *spotify.Client, albumID spotify.ID) ([]*Song, error) {
+	songsInAlbum, err := client.GetAlbumTracks(context.Background(), albumID)
+	if err != nil {
+		return nil, err
+	}
+	songs := make([]*Song, len(songsInAlbum.Tracks))
+	for i := range songsInAlbum.Tracks {
+		s := &Song{
+			Name:    songsInAlbum.Tracks[i].Name,
+			SongURI: songsInAlbum.Tracks[i].URI,
 		}
 
 		songs[i] = s

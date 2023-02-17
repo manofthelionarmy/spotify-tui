@@ -18,8 +18,6 @@ func (m *composite) getArtists(query string) tea.Cmd {
 func (m *composite) handleSelectedArtist() tea.Cmd {
 	// return songs
 	return func() tea.Msg {
-		// set this to true
-		// m.displayArtists.selectedArtist = false
 
 		// get the selected item
 		seletectedItem := m.displayArtists.list.SelectedItem()
@@ -53,5 +51,12 @@ func (m *composite) handleSearchAlbums() tea.Cmd {
 	return func() tea.Msg {
 		albums, _ := models.GetAlbums(m.spotifyClient, m.artistID)
 		return SpotifyAlbumsResponse(albums)
+	}
+}
+
+func (m *composite) handleSearchSongsInAlbum() tea.Cmd {
+	return func() tea.Msg {
+		songs, _ := models.GetSongsInAlbum(m.spotifyClient, m.albumID)
+		return SpotifySearchSongsRespMsg(songs)
 	}
 }

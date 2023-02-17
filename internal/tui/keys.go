@@ -7,7 +7,8 @@ type KeyMap struct {
 	GoBack                   key.Binding
 	ClearSearch              key.Binding
 	SelectedArtist           key.Binding
-	SelectedSong             key.Binding
+	SelectAblum              key.Binding
+	SelectedSong             key.Binding // TODO: maintain only one selecting key
 	SelectedAlbumOrTopTracks key.Binding
 	SubmitSearch             key.Binding
 	ForceQuit                key.Binding
@@ -39,6 +40,9 @@ func AppKeyMap() KeyMap {
 			key.WithKeys("enter"),
 		),
 		SelectedSong: key.NewBinding(
+			key.WithKeys("enter"),
+		),
+		SelectAblum: key.NewBinding(
 			key.WithKeys("enter"),
 		),
 	}

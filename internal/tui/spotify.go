@@ -62,6 +62,7 @@ type composite struct {
 	displaySongs
 	appState
 	artistID      spotify.ID
+	albumID       spotify.ID
 	spotifyClient *spotify.Client
 	width         int
 	height        int
@@ -181,9 +182,7 @@ func (m *composite) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	} else if m.appState == selectingAlbumsOrTopTracks {
 		cmds = append(cmds, m.handleSelectingAlbumsOrTopTracks(msg))
 	} else if m.appState == browsingAlbums {
-		var cmd tea.Cmd
-		m.displayAlbums.list, cmd = m.displayAlbums.list.Update(msg)
-		cmds = append(cmds, cmd)
+		cmds = append(cmds, m.handleSelectAlbum(msg))
 	}
 
 	return m, tea.Batch(cmds...)
@@ -192,16 +191,19 @@ func (m *composite) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 // View renders the program's UI, which is just a string. The view is
 // rendered after every Update.
 func (m *composite) View() string {
+	var view string
 	if m.appState == browsingAlbums {
 		// why isn't this displaying?
-		return m.displayAlbums.list.View()
+		view = m.displayAlbums.list.View()
 	} else if m.appState == selectingAlbumsOrTopTracks {
-		return m.albumTracks.View()
-	} else if m.appState != browsingSongs {
-		return m.searchPrompt.View() + "\n" +
+		view = m.albumTracks.View()
+	} else if m.appState == searchingArtists || m.appState == browsingArtists {
+		view = m.searchPrompt.View() + "\n" +
 			m.displayArtists.list.View()
+	} else if m.appState == browsingSongs {
+		view = m.displaySongs.list.View()
 	}
-	return m.displaySongs.list.View()
+	return view
 }
 
 // It looks like we are currently searching for artists
@@ -213,7 +215,6 @@ func (m *composite) handleSearchingForArtists() {
 
 func (m *composite) resetDisplayArtist() {
 	m.selectedArtist = false
-	m.selectedChoice = false
 	// remove all of the items
 	for len(m.displayArtists.list.Items()) > 0 {
 		m.displayArtists.list.RemoveItem(0)
@@ -228,26 +229,41 @@ func (m *composite) setAppState(state appState) {
 	m.appState = state
 }
 
-func (m *composite) resetComposite() {
-	m.artistID = ""
+// func (m *composite) resetComposite() {
+// 	m.artistID = ""
+// 	m.albumID = ""
+// }
+
+func (m *composite) resetPickFromChoices() {
+	m.pickFromChoices.selectedChoice = false
 }
 
 func (m *composite) resetSearchPrompt() {
-	// the esc key is resolved for list.Model... ugggghh
 	m.searchPrompt.searching = false
 	m.searchPrompt.textInput.Reset()
 	m.searchPrompt.textInput.Focus()
 }
 
+// I should be making tests for these kind of things
 func (m *composite) resetSongsList() {
-	// remove all of the items
-	for len(m.displayArtists.list.Items()) > 0 {
+	for len(m.displaySongs.list.Items()) > 0 {
 		m.displaySongs.list.RemoveItem(0)
 	}
 
 	// remove all of the artists
 	for len(m.displaySongs.songs) > 0 {
 		m.displaySongs.songs = m.displaySongs.songs[:len(m.displaySongs.songs)-1]
+	}
+}
+
+func (m *composite) resetAlbumsList() {
+	for len(m.displayAlbums.list.Items()) > 0 {
+		m.displayAlbums.list.RemoveItem(0)
+	}
+
+	// remove all of the artists
+	for len(m.displayAlbums.albums) > 0 {
+		m.displayAlbums.albums = m.displayAlbums.albums[:len(m.displayAlbums.albums)-1]
 	}
 }
 
@@ -258,20 +274,30 @@ func (m *composite) updateKeyBindings() {
 		m.keyMap.SelectedArtist.SetEnabled(false)
 		m.keyMap.SelectedSong.SetEnabled(false)
 		m.keyMap.SelectedAlbumOrTopTracks.SetEnabled(false)
+		m.keyMap.SelectAblum.SetEnabled(false)
 	case browsingArtists:
 		m.keyMap.SubmitSearch.SetEnabled(false)
 		m.keyMap.SelectedArtist.SetEnabled(true)
 		m.keyMap.SelectedSong.SetEnabled(false)
 		m.keyMap.SelectedAlbumOrTopTracks.SetEnabled(false)
+		m.keyMap.SelectAblum.SetEnabled(false)
 	case browsingSongs:
 		m.keyMap.SubmitSearch.SetEnabled(false)
 		m.keyMap.SelectedArtist.SetEnabled(false)
 		m.keyMap.SelectedAlbumOrTopTracks.SetEnabled(false)
 		m.keyMap.SelectedSong.SetEnabled(true)
+		m.keyMap.SelectAblum.SetEnabled(false)
 	case selectingAlbumsOrTopTracks:
 		m.keyMap.SubmitSearch.SetEnabled(false)
 		m.keyMap.SelectedArtist.SetEnabled(false)
 		m.keyMap.SelectedSong.SetEnabled(false)
 		m.keyMap.SelectedAlbumOrTopTracks.SetEnabled(true)
+		m.keyMap.SelectAblum.SetEnabled(false)
+	case browsingAlbums:
+		m.keyMap.SubmitSearch.SetEnabled(false)
+		m.keyMap.SelectedArtist.SetEnabled(false)
+		m.keyMap.SelectedSong.SetEnabled(false)
+		m.keyMap.SelectedAlbumOrTopTracks.SetEnabled(false)
+		m.keyMap.SelectAblum.SetEnabled(true)
 	}
 }
