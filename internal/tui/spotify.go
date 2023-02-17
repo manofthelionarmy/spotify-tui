@@ -166,8 +166,8 @@ func (m *composite) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.handleSearchArtistResponse(ArtistsResponse(msg))
 	case tea.WindowSizeMsg:
 		m.displayArtists.list.SetSize(msg.Width, msg.Height-10)
-		m.displaySongs.list.SetSize(msg.Width, msg.Height)
-		m.displayAlbums.list.SetSize(msg.Width, msg.Height)
+		m.displaySongs.list.SetSize(msg.Width, msg.Height-10)
+		m.displayAlbums.list.SetSize(msg.Width, msg.Height-10) // there is rendering issues when we do max height
 	case tea.KeyMsg:
 		if key.Matches(msg, m.keyMap.ForceQuit) {
 			return m, tea.Quit
@@ -230,11 +230,6 @@ func (m *composite) setAppState(state appState) {
 	m.appState = state
 }
 
-// func (m *composite) resetComposite() {
-// 	m.artistID = ""
-// 	m.albumID = ""
-// }
-
 func (m *composite) resetPickFromChoices() {
 	m.pickFromChoices.selectedChoice = false
 }
@@ -247,25 +242,12 @@ func (m *composite) resetSearchPrompt() {
 
 // I should be making tests for these kind of things
 func (m *composite) resetSongsList() {
-	for len(m.displaySongs.list.Items()) > 0 {
-		m.displaySongs.list.RemoveItem(0)
-	}
-
-	// remove all of the artists
-	for len(m.displaySongs.songs) > 0 {
-		m.displaySongs.songs = m.displaySongs.songs[:len(m.displaySongs.songs)-1]
-	}
+	m.displaySongs.list.SetItems([]list.Item{})
 }
 
 func (m *composite) resetAlbumsList() {
-	for len(m.displayAlbums.list.Items()) > 0 {
-		m.displayAlbums.list.RemoveItem(0)
-	}
-
-	// remove all of the artists
-	for len(m.displayAlbums.albums) > 0 {
-		m.displayAlbums.albums = m.displayAlbums.albums[:len(m.displayAlbums.albums)-1]
-	}
+	// I'm not sure what the consequences of this are, will go's garbage collector take care of it?
+	m.displayAlbums.list.SetItems([]list.Item{})
 }
 
 func (m *composite) updateKeyBindings() {

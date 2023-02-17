@@ -73,7 +73,6 @@ func (m *composite) handleBrowsingSongs(msg tea.Msg) tea.Cmd {
 			m.albumURI = ""
 			// reset this because we want to select a new album
 			m.selectedAlbum = false
-			return nil
 		} else if key.Matches(msg, m.keyMap.SelectedSong) {
 			// TODO: how to pass the album uri?
 			m.handleSelectedSong(m.albumURI)
@@ -102,6 +101,7 @@ func (m *composite) handleSelectingAlbumsOrTopTracks(msg tea.Msg) tea.Cmd {
 			m.artistID = ""
 			m.updateKeyBindings()
 
+			// update these on a reset...?
 			m.searchPrompt.textInput, cmd = m.searchPrompt.textInput.Update(msg)
 			cmds = append(cmds, cmd)
 			m.displayArtists.list, cmd = m.displayArtists.list.Update(msg)
@@ -112,9 +112,6 @@ func (m *composite) handleSelectingAlbumsOrTopTracks(msg tea.Msg) tea.Cmd {
 			m.updateKeyBindings()
 		}
 	}
-
-	m.pickFromChoices.albumTracks, cmd = m.albumTracks.Update(msg)
-	cmds = append(cmds, cmd)
 	if m.selectedChoice {
 		albumTrcks, _ := m.albumTracks.(*albumTracks)
 		switch albumTrcks.SelectedItem() {
@@ -123,6 +120,9 @@ func (m *composite) handleSelectingAlbumsOrTopTracks(msg tea.Msg) tea.Cmd {
 		case "Top Tracks":
 		}
 	}
+
+	m.pickFromChoices.albumTracks, cmd = m.albumTracks.Update(msg)
+	cmds = append(cmds, cmd)
 	return tea.Batch(cmds...)
 }
 

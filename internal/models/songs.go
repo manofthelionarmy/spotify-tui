@@ -57,7 +57,7 @@ func GetSongsInAlbum(client *spotify.Client, albumID spotify.ID) ([]*Song, error
 			Name:    songsInAlbum.Tracks[i].Name,
 			SongURI: songsInAlbum.Tracks[i].URI,
 			Offset: spotify.PlaybackOffset{
-				Position: songsInAlbum.Tracks[i].TrackNumber,
+				Position: i, // Why isn't track number correct?, follow up, but this works
 			},
 		}
 

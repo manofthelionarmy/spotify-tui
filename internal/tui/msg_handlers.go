@@ -17,19 +17,17 @@ func (m *composite) handleSearchArtistResponse(artists []*models.Artist) {
 }
 
 func (m *composite) handleSearchSongsResponse(songs []*models.Song) {
-	m.displaySongs.songs = songs
-	items := make([]list.Item, len(m.displaySongs.songs))
+	items := make([]list.Item, len(songs))
 	for i := range items {
-		items[i] = m.displaySongs.songs[i]
+		items[i] = songs[i]
 	}
 	m.displaySongs.list.SetItems(items)
 }
 
 func (m *composite) handleAlbumsReponse(albums []*models.Album) {
-	m.displayAlbums.albums = albums
-	items := make([]list.Item, len(m.displayAlbums.albums))
+	items := make([]list.Item, len(albums))
 	for i := range items {
-		items[i] = m.displayAlbums.albums[i]
+		items[i] = albums[i]
 	}
 	m.displayAlbums.list.SetItems(items)
 }
