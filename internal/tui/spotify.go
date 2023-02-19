@@ -32,8 +32,13 @@ type displayArtists struct {
 	list           list.Model
 }
 
-type pickFromChoices struct {
-	albumTracks    tea.Model
+type displayArtistMenu struct {
+	artistMenu     tea.Model
+	selectedChoice bool
+}
+
+type displayMainMenu struct {
+	mainMenu       tea.Model
 	selectedChoice bool
 }
 
@@ -55,17 +60,19 @@ type appState int
 
 const (
 	searchingArtists appState = iota
-	selectingAlbumsOrTopTracks
+	selectingFromArtistMenu
 	browsingArtists
 	browsingSongs
 	browsingAlbums
+	selectFromMainMenu
 )
 
 type composite struct {
 	keyMap KeyMap
+	displayMainMenu
 	searchPrompt
 	displayArtists
-	pickFromChoices
+	displayArtistMenu
 	displayAlbums
 	displaySongs
 	appState
@@ -120,8 +127,8 @@ func NewComposite() tea.Model {
 			renderSongs:  false,
 			selectedSong: false,
 		},
-		pickFromChoices: pickFromChoices{
-			albumTracks:    NewAlbumTracks(),
+		displayArtistMenu: displayArtistMenu{
+			artistMenu:     NewArtistMenu(),
 			selectedChoice: false,
 		},
 		displayAlbums: displayAlbums{
@@ -129,8 +136,12 @@ func NewComposite() tea.Model {
 			albums:        nil,
 			list:          albumList,
 		},
+		displayMainMenu: displayMainMenu{
+			mainMenu:       NewMainMenu(),
+			selectedChoice: false,
+		},
 		keyMap:   AppKeyMap(),
-		appState: searchingArtists,
+		appState: selectFromMainMenu,
 	}
 	composite.updateKeyBindings()
 	return composite
@@ -192,10 +203,12 @@ func (m *composite) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		cmds = append(cmds, m.handleBrowsingArtists(msg))
 	} else if m.appState == browsingSongs {
 		cmds = append(cmds, m.handleBrowsingSongs(msg))
-	} else if m.appState == selectingAlbumsOrTopTracks {
+	} else if m.appState == selectingFromArtistMenu {
 		cmds = append(cmds, m.handleSelectingAlbumsOrTopTracks(msg))
 	} else if m.appState == browsingAlbums {
 		cmds = append(cmds, m.handleSelectAlbum(msg))
+	} else if m.appState == selectFromMainMenu {
+		cmds = append(cmds, m.handleSelectFromMainMenu(msg))
 	}
 
 	return m, tea.Batch(cmds...)
@@ -205,16 +218,18 @@ func (m *composite) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 // rendered after every Update.
 func (m *composite) View() string {
 	var view string
-	if m.appState == browsingAlbums {
+	switch m.appState {
+	case browsingAlbums:
 		view = m.displayAlbums.list.View()
-	} else if m.appState == selectingAlbumsOrTopTracks {
-		view = m.albumTracks.View()
-	} else if m.appState == searchingArtists || m.appState == browsingArtists {
-		// look into how to do a join
+	case selectingFromArtistMenu:
+		view = m.artistMenu.View()
+	case searchingArtists, browsingArtists:
 		view = lipgloss.JoinVertical(lipgloss.Top, searchStyle.Render(m.searchPrompt.View()),
 			listStyle.Render(m.displayArtists.list.View()))
-	} else if m.appState == browsingSongs {
+	case browsingSongs:
 		view = m.displaySongs.list.View()
+	case selectFromMainMenu:
+		view = m.displayMainMenu.mainMenu.View()
 	}
 	return view
 }
@@ -243,7 +258,7 @@ func (m *composite) setAppState(state appState) {
 }
 
 func (m *composite) resetPickFromChoices() {
-	m.pickFromChoices.selectedChoice = false
+	m.displayArtistMenu.selectedChoice = false
 }
 
 func (m *composite) resetSearchPrompt() {
@@ -268,31 +283,58 @@ func (m *composite) updateKeyBindings() {
 		m.keyMap.SubmitSearch.SetEnabled(true)
 		m.keyMap.SelectedArtist.SetEnabled(false)
 		m.keyMap.SelectedSong.SetEnabled(false)
-		m.keyMap.SelectedAlbumOrTopTracks.SetEnabled(false)
+		m.keyMap.SelectedFromArtistMenu.SetEnabled(false)
+		m.keyMap.SelectedFromMainMenu.SetEnabled(false)
 		m.keyMap.SelectAblum.SetEnabled(false)
 	case browsingArtists:
 		m.keyMap.SubmitSearch.SetEnabled(false)
 		m.keyMap.SelectedArtist.SetEnabled(true)
 		m.keyMap.SelectedSong.SetEnabled(false)
-		m.keyMap.SelectedAlbumOrTopTracks.SetEnabled(false)
+		m.keyMap.SelectedFromArtistMenu.SetEnabled(false)
+		m.keyMap.SelectedFromMainMenu.SetEnabled(false)
 		m.keyMap.SelectAblum.SetEnabled(false)
 	case browsingSongs:
 		m.keyMap.SubmitSearch.SetEnabled(false)
 		m.keyMap.SelectedArtist.SetEnabled(false)
-		m.keyMap.SelectedAlbumOrTopTracks.SetEnabled(false)
+		m.keyMap.SelectedFromArtistMenu.SetEnabled(false)
+		m.keyMap.SelectedFromMainMenu.SetEnabled(false)
 		m.keyMap.SelectedSong.SetEnabled(true)
 		m.keyMap.SelectAblum.SetEnabled(false)
-	case selectingAlbumsOrTopTracks:
+	case selectingFromArtistMenu:
 		m.keyMap.SubmitSearch.SetEnabled(false)
 		m.keyMap.SelectedArtist.SetEnabled(false)
 		m.keyMap.SelectedSong.SetEnabled(false)
-		m.keyMap.SelectedAlbumOrTopTracks.SetEnabled(true)
+		m.keyMap.SelectedFromArtistMenu.SetEnabled(true)
+		m.keyMap.SelectedFromMainMenu.SetEnabled(false)
 		m.keyMap.SelectAblum.SetEnabled(false)
 	case browsingAlbums:
 		m.keyMap.SubmitSearch.SetEnabled(false)
 		m.keyMap.SelectedArtist.SetEnabled(false)
 		m.keyMap.SelectedSong.SetEnabled(false)
-		m.keyMap.SelectedAlbumOrTopTracks.SetEnabled(false)
+		m.keyMap.SelectedFromArtistMenu.SetEnabled(false)
+		m.keyMap.SelectedFromMainMenu.SetEnabled(false)
 		m.keyMap.SelectAblum.SetEnabled(true)
+	case selectFromMainMenu:
+		m.keyMap.SubmitSearch.SetEnabled(false)
+		m.keyMap.SelectedArtist.SetEnabled(false)
+		m.keyMap.SelectedSong.SetEnabled(false)
+		m.keyMap.SelectedFromArtistMenu.SetEnabled(false)
+		m.keyMap.SelectedFromMainMenu.SetEnabled(true)
+		m.keyMap.SelectAblum.SetEnabled(false)
 	}
+}
+
+func (m *composite) returnNewAppStateFromMainMenuChoice() appState {
+	menu, _ := m.displayMainMenu.mainMenu.(*menu)
+	switch menu.choices[menu.cursor] {
+	case search:
+		return searchingArtists
+	case artists:
+		// TODO: add the other states we'll handle based on the flows
+	case albums:
+	case songs:
+	case playlists:
+	}
+	// TODO update
+	return searchingArtists
 }

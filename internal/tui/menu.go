@@ -6,28 +6,45 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
-type albumTracks struct {
+// these are the choices available in these menus
+const (
+	search    = "Search"
+	artists   = "Artists"
+	albums    = "Albums"
+	songs     = "Songs"
+	playlists = "Playlists"
+	topTracks = "Top Tracks"
+)
+
+type menu struct {
 	choices  []string
 	cursor   int
 	selected bool
 }
 
-// NewAlbumTracks returns a new menu with choices to select albums or top tracks
-func NewAlbumTracks() tea.Model {
-	return &albumTracks{
-		choices: []string{"Albums", "Top Tracks"},
+// NewArtistMenu returns a new menu with choices to select albums or top tracks
+func NewArtistMenu() tea.Model {
+	return &menu{
+		choices: []string{albums, topTracks},
+	}
+}
+
+// NewMainMenu returns the main menu to select search, artists, albums, etc
+func NewMainMenu() tea.Model {
+	return &menu{
+		choices: []string{search, artists, albums, songs, playlists},
 	}
 }
 
 // Init is the first function that will be called. It returns an optional
 // initial command. To not perform an initial command return nil.
-func (m *albumTracks) Init() tea.Cmd {
+func (m *menu) Init() tea.Cmd {
 	return nil
 }
 
 // Update is called when a message is received. Use it to inspect messages
 // and, in response, update the model and/or send a command.
-func (m *albumTracks) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m *menu) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.String() {
@@ -47,7 +64,7 @@ func (m *albumTracks) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 // View renders the program's UI, which is just a string. The view is
 // rendered after every Update.
-func (m *albumTracks) View() string {
+func (m *menu) View() string {
 	s := ""
 	for i := range m.choices {
 		var selected string
@@ -61,6 +78,6 @@ func (m *albumTracks) View() string {
 	return s
 }
 
-func (m *albumTracks) SelectedItem() string {
+func (m *menu) SelectedItem() string {
 	return m.choices[m.cursor]
 }

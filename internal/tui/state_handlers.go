@@ -16,6 +16,10 @@ func (m *composite) handleSearchingArtists(msg tea.Msg) tea.Cmd {
 			m.appState = browsingArtists
 			m.searching = true
 			m.updateKeyBindings()
+		case key.Matches(msg, m.keyMap.GoBack):
+			m.appState = selectFromMainMenu
+			m.searching = false
+			m.updateKeyBindings()
 		}
 	}
 	newTextInputInput, cmd := m.searchPrompt.textInput.Update(msg)
@@ -43,7 +47,7 @@ func (m *composite) handleBrowsingArtists(msg tea.Msg) tea.Cmd {
 		}
 		if key.Matches(msg, m.keyMap.SelectedArtist) {
 			m.selectedArtist = true
-			m.setAppState(selectingAlbumsOrTopTracks)
+			m.setAppState(selectingFromArtistMenu)
 			artist, _ := m.displayArtists.list.SelectedItem().(*models.Artist)
 			m.artistID = artist.ID
 			m.updateKeyBindings()
@@ -107,14 +111,14 @@ func (m *composite) handleSelectingAlbumsOrTopTracks(msg tea.Msg) tea.Cmd {
 			cmds = append(cmds, cmd)
 			m.displayArtists.list, cmd = m.displayArtists.list.Update(msg)
 			cmds = append(cmds, cmd)
-		} else if key.Matches(msg, m.keyMap.SelectedAlbumOrTopTracks) {
-			m.selectedChoice = true
+		} else if key.Matches(msg, m.keyMap.SelectedFromArtistMenu) {
+			m.displayArtistMenu.selectedChoice = true
 			m.appState = browsingAlbums
 			m.updateKeyBindings()
 		}
 	}
-	if m.selectedChoice {
-		albumTrcks, _ := m.albumTracks.(*albumTracks)
+	if m.displayArtistMenu.selectedChoice {
+		albumTrcks, _ := m.artistMenu.(*menu)
 		switch albumTrcks.SelectedItem() {
 		case "Albums":
 			cmds = append(cmds, m.handleSearchAlbums())
@@ -122,7 +126,7 @@ func (m *composite) handleSelectingAlbumsOrTopTracks(msg tea.Msg) tea.Cmd {
 		}
 	}
 
-	m.pickFromChoices.albumTracks, cmd = m.albumTracks.Update(msg)
+	m.displayArtistMenu.artistMenu, cmd = m.artistMenu.Update(msg)
 	cmds = append(cmds, cmd)
 	return tea.Batch(cmds...)
 }
@@ -134,7 +138,7 @@ func (m *composite) handleSelectAlbum(msg tea.Msg) tea.Cmd {
 	case tea.KeyMsg:
 		if key.Matches(msg, m.keyMap.GoBack) {
 			m.resetPickFromChoices()
-			m.setAppState(selectingAlbumsOrTopTracks)
+			m.setAppState(selectingFromArtistMenu)
 			m.updateKeyBindings()
 
 			return nil
@@ -156,4 +160,21 @@ func (m *composite) handleSelectAlbum(msg tea.Msg) tea.Cmd {
 	m.displayAlbums.list, cmd = m.displayAlbums.list.Update(msg)
 	cmds = append(cmds, cmd)
 	return tea.Batch(cmds...)
+}
+
+func (m *composite) handleSelectFromMainMenu(msg tea.Msg) tea.Cmd {
+	var cmd tea.Cmd
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		if key.Matches(msg, m.keyMap.SelectedFromMainMenu) {
+			m.displayMainMenu.selectedChoice = true
+		}
+	}
+	if m.displayMainMenu.selectedChoice {
+		m.appState = m.returnNewAppStateFromMainMenuChoice()
+		m.displayMainMenu.selectedChoice = false
+		m.updateKeyBindings()
+	}
+	m.displayMainMenu.mainMenu, cmd = m.displayMainMenu.mainMenu.Update(msg)
+	return cmd
 }
