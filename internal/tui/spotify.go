@@ -10,8 +10,16 @@ import (
 	"github.com/charmbracelet/bubbles/list"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/zmb3/spotify/v2"
 )
+
+var listStyle = lipgloss.NewStyle().Margin(0, 2).
+	Width(25).
+	BorderStyle(lipgloss.NormalBorder())
+var searchStyle = lipgloss.NewStyle().Margin(0, 2).
+	Width(25).
+	BorderStyle(lipgloss.NormalBorder())
 
 type searchPrompt struct {
 	searching bool
@@ -82,16 +90,17 @@ func NewComposite() tea.Model {
 	textInput.CharLimit = 156
 	textInput.TextStyle.Height(10)
 	textInput.Width = 20
+	textInput.PromptStyle.Border(lipgloss.NormalBorder())
 
-	artistList := list.New([]list.Item{}, list.DefaultDelegate{}, 0, 0)
+	artistList := list.New([]list.Item{}, list.NewDefaultDelegate(), 0, 0)
 	artistList.Title = "Artists..."
 	artistList.KeyMap.Quit.Unbind()
 
-	songsList := list.New([]list.Item{}, list.DefaultDelegate{}, 0, 0)
+	songsList := list.New([]list.Item{}, list.NewDefaultDelegate(), 0, 0)
 	songsList.Title = "Songs..."
 	songsList.KeyMap.Quit.Unbind()
 
-	albumList := list.New([]list.Item{}, list.DefaultDelegate{}, 0, 0)
+	albumList := list.New([]list.Item{}, list.NewDefaultDelegate(), 0, 0)
 	albumList.Title = "Albums..."
 	albumList.KeyMap.Quit.Unbind()
 
@@ -165,9 +174,12 @@ func (m *composite) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case SpotifySearchArtistsMsg:
 		m.handleSearchArtistResponse(ArtistsResponse(msg))
 	case tea.WindowSizeMsg:
-		m.displayArtists.list.SetSize(msg.Width, msg.Height-10)
-		m.displaySongs.list.SetSize(msg.Width, msg.Height-10)
-		m.displayAlbums.list.SetSize(msg.Width, msg.Height-10) // there is rendering issues when we do max height
+		h, v := searchStyle.GetFrameSize()
+		// m.list.SetSize(msg.Width-h, msg.Height-v)
+		// for some reason, this was pushing this up
+		m.displayArtists.list.SetSize(msg.Width-h, msg.Height-5-v)
+		m.displaySongs.list.SetSize(msg.Width-h, msg.Height-v)
+		m.displayAlbums.list.SetSize(msg.Width-h, msg.Height-v) // there is rendering issues when we do max height
 	case tea.KeyMsg:
 		if key.Matches(msg, m.keyMap.ForceQuit) {
 			return m, tea.Quit
@@ -194,13 +206,13 @@ func (m *composite) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m *composite) View() string {
 	var view string
 	if m.appState == browsingAlbums {
-		// why isn't this displaying?
 		view = m.displayAlbums.list.View()
 	} else if m.appState == selectingAlbumsOrTopTracks {
 		view = m.albumTracks.View()
 	} else if m.appState == searchingArtists || m.appState == browsingArtists {
-		view = m.searchPrompt.View() + "\n" +
-			m.displayArtists.list.View()
+		// look into how to do a join
+		view = lipgloss.JoinVertical(lipgloss.Top, searchStyle.Render(m.searchPrompt.View()),
+			listStyle.Render(m.displayArtists.list.View()))
 	} else if m.appState == browsingSongs {
 		view = m.displaySongs.list.View()
 	}

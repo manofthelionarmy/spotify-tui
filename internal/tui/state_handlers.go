@@ -35,6 +35,7 @@ func (m *composite) handleBrowsingArtists(msg tea.Msg) tea.Cmd {
 	case tea.KeyMsg:
 		if key.Matches(msg, m.keyMap.ClearSearch) {
 			// a bit weird but we're saying we want to clear the search
+			// TODO: handle logic for filtering
 			m.resetSearchPrompt()
 			m.setAppState(searchingArtists)
 			m.updateKeyBindings()
